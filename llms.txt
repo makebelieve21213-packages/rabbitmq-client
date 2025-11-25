@@ -1,0 +1,341 @@
+# @makebelieve21213-packages/rabbitmq-client - Документация для ИИ
+
+## Краткое описание
+
+RabbitMQ клиент для NestJS с поддержкой TypeScript и полной типобезопасностью. Предоставляет готовый NestJS глобальный модуль для простой интеграции и работы с RabbitMQ в микросервисной архитектуре. Поддерживает retry-механизмы, Dead Letter Queue (DLQ) и идемпотентность сообщений.
+
+## Архитектура
+
+Пакет предоставляет NestJS глобальный модуль `RabbitMQModule` для отправки сообщений и функции `connectRabbitMQReceiver` / `connectRabbitMQReceivers` для получения сообщений через RabbitMQ.
+
+## Структура пакета
+
+```
+src/
+├── main/                                 # NestJS модуль и сервисы
+│   ├── rabbitmq.module.ts                # RabbitMQModule - глобальный модуль
+│   ├── rabbitmq.service.ts               # RabbitMQService - основной сервис отправки
+│   └── rabbitmq.interceptor.ts           # RabbitMQIdempotencyInterceptor - интерцептор идемпотентности
+│
+├── config/                               # Фабрики конфигураций
+│   └── factories.ts                      # createSenderConfig, createReceiverConfig, createRetryConfig, createDLXConfig
+│
+├── types/                                # TypeScript типы и интерфейсы
+│   ├── rabbitmq-module-options.ts        # Опции модуля
+│   ├── rabbitmq-sender-options.ts        # Опции для отправки сообщений
+│   ├── rabbitmq-receiver-options.ts      # Опции для получения сообщений
+│   ├── rabbitmq-receiver-subscription.ts # Тип подписки receiver
+│   ├── rabbitmq-receivers-config.ts      # Конфигурация множественных receivers
+│   ├── rabbitmq-config-dlx.ts            # Конфигурация DLX
+│   ├── rabbitmq-config-retry.ts          # Конфигурация retry
+│   ├── rabbitmq-config-receiver.ts       # Конфигурация receiver
+│   ├── rabbitmq-config-sender.ts         # Конфигурация sender
+│   ├── base.config.ts                    # Базовая конфигурация
+│   └── idempotent-message.ts             # Тип идемпотентного сообщения
+│
+├── utils/                                # Утилиты
+│   └── injections.ts                     # Ключи для DI (RABBITMQ_SENDER_SERVICE)
+│
+├── connect-rabbitmq-receiver.ts          # Функция подключения одной подписки
+├── connect-rabbitmq-receivers.ts         # Функция подключения множественных подписок
+└── index.ts                              # Точка входа - экспорты всех публичных API
+```
+
+## Основные компоненты
+
+### RabbitMQModule
+
+NestJS глобальный модуль для регистрации RabbitMQService. Поддерживает асинхронную регистрацию:
+- `forRootAsync(options)` - асинхронная конфигурация через useFactory
+- Экспортирует `RabbitMQService` глобально
+- Регистрирует sender конфигурацию через `ClientsModule.registerAsync()`
+
+### RabbitMQService
+
+Сервис для отправки сообщений через RabbitMQ:
+- Конструктор принимает `ClientProxy` через DI по ключу `RABBITMQ_SENDER_SERVICE`
+- `fireAndForget<I>(key: ROUTING_KEYS, data: I)` - отправка без ожидания ответа (emit), не добавляет correlationId
+- `publish<I, O>(key: ROUTING_KEYS, data: I): Promise<O>` - отправка с ожиданием ответа (send, RPC pattern), автоматически добавляет correlationId и correlationTimestamp для идемпотентности
+- Реализует `OnModuleInit` и `OnModuleDestroy` для управления подключением
+- Получает `routingKeys` из конфигурации sender динамически через `createSenderConfig()` из `ConfigService.get("rabbitmqSender")`
+
+### connectRabbitMQReceiver
+
+Асинхронная функция для подключения приложения к получению сообщений из одной очереди:
+- Получает `LoggerService` и `RedisService` из DI контейнера
+- Создает receiver конфигурацию динамически через `createReceiverConfig(receiverOptions)`
+- Создает retry конфигурацию динамически через `createRetryConfig(receiverOptions)`
+- Создает DLX конфигурацию динамически через `createDLXConfig(receiverOptions)`
+- Настраивает основную очередь для получения сообщений через `connectMicroservice()` с receiver конфигурацией
+- Подключает retry очередь через `connectMicroservice()` с retry конфигурацией
+- Устанавливает глобальный Interceptor `RabbitMQIdempotencyInterceptor` для проверки идемпотентности (только если `skipGlobalSetup = false`)
+- Подключает единую DLX очередь для критических ошибок (создается только один раз, только если `skipGlobalSetup = false`)
+- Retry очередь работает автоматически через механизм DLX RabbitMQ (не требует явного подключения микросервиса для обработки)
+- **ВАЖНО:** Не устанавливает `UnifiedExceptionFilter` и `UnifiedInterceptor` из `@makebelieve21213-packages/nest-common` - их необходимо установить вручную в `main.ts` перед вызовом `connectRabbitMQReceiver`
+
+### connectRabbitMQReceivers
+
+Асинхронная функция для подключения множественных подписок RabbitMQ:
+- Принимает массив готовых объектов `RabbitMQReceiverOptions`
+- Вызывает `connectRabbitMQReceiver` для каждой подписки
+- Для первой подписки (`isFirstSubscription = true`) устанавливает `RabbitMQIdempotencyInterceptor` и подключает DLX очередь
+- Для последующих подписок (`skipGlobalSetup = true`) пропускает установку глобальных компонентов
+- Единая DLX очередь используется для всех подписок (создается только один раз при первой подписке)
+- **ВАЖНО:** Не устанавливает `UnifiedExceptionFilter` и `UnifiedInterceptor` из `@makebelieve21213-packages/nest-common` - их необходимо установить вручную в `main.ts` перед вызовом `connectRabbitMQReceivers`
+
+### RabbitMQIdempotencyInterceptor
+
+Глобальный интерцептор для проверки идемпотентности сообщений:
+- **⚠️ ОБЯЗАТЕЛЬНО:** Требует наличия `RedisService` из пакета `@makebelieve21213-packages/redis-client` в DI контейнере приложения. Без подключенного Redis интерцептор будет пропускать проверку идемпотентности и продолжать обработку сообщений (graceful degradation).
+- Работает только для RPC контекстов (RabbitMQ)
+- Проверяет наличие `correlationId` в сообщении перед обработкой
+- Если `correlationId` отсутствует, пропускает проверку идемпотентности
+- Использует Redis для отслеживания обработанных сообщений по ключу `rabbitmq:idempotency:${correlationId}`
+- Значение ключа: `correlationTimestamp` (timestamp создания сообщения)
+- TTL ключа: 24 часа (86400 секунд)
+- При обнаружении дубликата: подтверждает сообщение (ACK) и возвращает успешный ответ `{ duplicate: true, correlationId }` без обработки
+- При новой обработке: сохраняет `correlationId` в Redis и продолжает обработку
+- При ошибке обработки: удаляет ключ из Redis для возможности повторной обработки
+- При ошибке Redis: продолжает обработку сообщения (graceful degradation)
+
+### RabbitMQModuleOptions
+
+Конфигурация для настройки модуля отправки сообщений:
+- `RabbitMQSenderOptions` - опции для sender конфигурации
+  - Обязательные: `url`, `exchange`, `exchangeType`
+  - Опциональные: `replyQueueOptions` с параметрами `durable` (default: false) и `autoDelete` (default: true)
+
+### RabbitMQReceiverOptions
+
+Конфигурация для настройки получения сообщений:
+- Обязательные: `url`, `exchange`, `exchangeType`, `queue`, `pattern`
+- Опциональные: `prefetchCount` (default: 10), `noAck` (default: false), `replyQueue` (default: `${queue}.reply`)
+- Опциональные параметры retry: `retryQueue` (default: `${queue}.retry`), `retryExchange` (default: `${exchange}.retry`), `retryExchangeType` (default: `exchangeType`), `retryTtl` (default: 5000)
+- Опциональные параметры DLX: `dlxQueue` (default: `global.dlx`), `dlxExchange` (default: `events_exchange.dlx`), `dlxExchangeType` (default: `exchangeType`)
+
+### UnifiedExceptionFilter (из @makebelieve21213-packages/nest-common)
+
+Глобальный фильтр для обработки ошибок в HTTP и RabbitMQ-обработчиках:
+- **ВАЖНО:** Не устанавливается автоматически в `connectRabbitMQReceiver` - необходимо установить вручную в `main.ts` перед вызовом `connectRabbitMQReceiver` или `connectRabbitMQReceivers`
+- Принимает `LoggerService` и опциональный `dlxExchange` в конструкторе
+- Использует дефолтное значение `"events_exchange.dlx"` для exchange, если конфигурация не передана
+- Использует `RpcError.fromUnknown()` для преобразования любых ошибок в `RpcError`
+- Различает transient (временные) и permanent (постоянные) ошибки через `RpcError.isTransient()`
+- Специальная обработка ошибок валидации (`VALIDATION_ERROR`, `RPC_VALIDATION_ERROR`, или RpcException с "validation failed"): nack без requeue
+- Максимум 2 повторные попытки только для transient ошибок
+- Permanent ошибки сразу отправляются в DLX без retry
+- Автоматическая отправка в DLX после исчерпания попыток для transient ошибок
+- Подробное логирование всех ошибок с типом, количеством попыток и stack trace
+- Обработка не-RPC контекстов (например, HTTP) - логирование и проброс ошибки
+- Валидация RmqContext - проверка наличия необходимых методов (getChannelRef, getMessage, getPattern)
+- Подсчет попыток через `x-death` header из свойств сообщения
+
+## Типы данных
+
+Пакет экспортирует следующие типы:
+- `RabbitMQSenderOptions` - опции для конфигурации sender
+- `RabbitMQReceiverOptions` - опции для конфигурации receiver
+- `RabbitMQReceiverSubscription` - тип подписки receiver
+- `RabbitMQReceiversConfig` - тип конфигурации множественных receivers
+- `IdempotentMessage<T>` - тип идемпотентного сообщения с полями `id`, `timestamp`, `data`
+- `RabbitMQConfigSender` - конфигурация sender с `routingKeys`
+- `RabbitMQConfigReceiver` - конфигурация receiver с DLX на retry exchange
+- `RabbitMQConfigRetry` - конфигурация retry с TTL и DLX на основную очередь
+- `RabbitMQConfigDLX` - конфигурация DLX для критических ошибок
+
+## Использование
+
+### Создание конфигурации в сервисе
+
+Создайте файл конфигурации в вашем сервисе (например, `services/your-service/src/configs/rabbitmq.config.ts`):
+
+```typescript
+// rabbitmq.config.ts
+import { registerAs } from "@nestjs/config";
+import type { RabbitMQSenderOptions, RabbitMQReceiverOptions } from "@makebelieve21213-packages/rabbitmq-client";
+import { EnvVariable } from "src/types/enums";
+
+export type RabbitMQConfiguration = {
+  sender: RabbitMQSenderOptions;
+  receiver: RabbitMQReceiverOptions;
+};
+
+const rabbitmqConfig = registerAs<RabbitMQConfiguration>(
+  "rabbitmq",
+  (): RabbitMQConfiguration => {
+    return {
+      sender: {
+        url: process.env[EnvVariable.RABBITMQ_URL]!,
+        exchange: process.env[EnvVariable.RABBITMQ_EXCHANGE] || "events_exchange",
+        exchangeType: process.env[EnvVariable.RABBITMQ_EXCHANGE_TYPE] || "topic",
+      },
+      receiver: {
+        url: process.env[EnvVariable.RABBITMQ_URL]!,
+        exchange: process.env[EnvVariable.RABBITMQ_EXCHANGE] || "events_exchange",
+        exchangeType: process.env[EnvVariable.RABBITMQ_EXCHANGE_TYPE] || "topic",
+        queue: process.env[EnvVariable.RABBITMQ_QUEUE]!,
+        pattern: process.env[EnvVariable.RABBITMQ_PATTERN]!,
+      },
+    };
+  },
+);
+
+export default rabbitmqConfig;
+```
+
+### Регистрация модуля
+
+```typescript
+// app.module.ts
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { RabbitMQModule } from '@makebelieve21213-packages/rabbitmq-client';
+import rabbitmqConfig from 'src/configs/rabbitmq.config';
+import type { RabbitMQConfiguration } from 'src/configs/rabbitmq.config';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [rabbitmqConfig],
+    }),
+    RabbitMQModule.forRootAsync<[RabbitMQConfiguration]>({
+      useFactory: (config: RabbitMQConfiguration) => config.sender,
+      inject: [rabbitmqConfig.KEY],
+      imports: [ConfigModule],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+### Подключение receiver в main.ts
+
+```typescript
+// main.ts
+import { ConfigService } from "@nestjs/config";
+import { NestFactory } from "@nestjs/core";
+import { connectLogger } from "@makebelieve21213-packages/logger";
+import { UnifiedExceptionFilter, UnifiedInterceptor } from "@makebelieve21213-packages/nest-common";
+import { connectRabbitMQReceiver, type RabbitMQReceiverOptions } from "@makebelieve21213-packages/rabbitmq-client";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  
+  const config = app.get(ConfigService);
+  const receiverOptions = config.get<RabbitMQReceiverOptions>("rabbitmq.receiver")!;
+  
+  // Перезаписываем стандартный логгер сервиса
+  const logger = await connectLogger(app, "YourService");
+  
+  // Получаем dlxExchange из конфигурации RabbitMQ для RPC обработки ошибок
+  const dlxExchange = receiverOptions.dlxExchange || "events_exchange.dlx";
+  
+  // Подключаем глобально единый фильтр для HTTP и RPC запросов (обработка ошибок)
+  app.useGlobalFilters(new UnifiedExceptionFilter(logger, dlxExchange));
+  
+  // Подключаем глобально единый перехватчик для HTTP и RPC запросов (логирование и метрики всех запросов)
+  app.useGlobalInterceptors(new UnifiedInterceptor(logger));
+  
+  // Подключаем RabbitMQ микросервис для получения сообщений
+  await connectRabbitMQReceiver(app, receiverOptions);
+  
+  await app.startAllMicroservices();
+  await app.listen(3000);
+}
+
+bootstrap();
+```
+
+### Использование сервиса
+
+```typescript
+// your.service.ts
+import { Injectable } from '@nestjs/common';
+import { RabbitMQService } from '@makebelieve21213-packages/rabbitmq-client';
+import { ROUTING_KEYS } from '@makebelieve21213-packages/rabbitmq-client';
+
+@Injectable()
+export class YourService {
+  constructor(private readonly rabbitMQ: RabbitMQService) {}
+
+  async sendFireAndForget() {
+    // Fire and forget - не добавляет correlationId
+    await this.rabbitMQ.fireAndForget(ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL, {
+      data: "example"
+    });
+  }
+
+  async sendRequestResponse() {
+    // Request-Response - автоматически добавляет correlationId и correlationTimestamp
+    const result = await this.rabbitMQ.publish<RequestData, ResponseData>(
+      ROUTING_KEYS.ANALYTICS_GLOBAL,
+      { query: "analytics" }
+    );
+    return result;
+  }
+}
+```
+
+## Переменные окружения
+
+- `RABBITMQ_URL` - URL подключения к RabbitMQ (обязательно)
+- `RABBITMQ_EXCHANGE` - Имя основного exchange (опционально, по умолчанию: `events_exchange`)
+- `RABBITMQ_EXCHANGE_TYPE` - Тип exchange (опционально, по умолчанию: `topic`)
+- `RABBITMQ_QUEUE` - Имя очереди для получения сообщений (обязательно для receiver)
+- `RABBITMQ_PATTERN` - Паттерн routing key для получения сообщений (обязательно для receiver)
+
+## Экспорты (index.ts)
+
+Пакет экспортирует:
+
+Модули:
+- `RabbitMQModule` (default export)
+
+Сервисы:
+- `RabbitMQService` (default export)
+
+Функции:
+- `connectRabbitMQReceiver` (default export)
+- `connectRabbitMQReceivers` (default export)
+
+Интерцепторы:
+- `RabbitMQIdempotencyInterceptor` (default export)
+
+Типы:
+- `RabbitMQSenderOptions`, `RabbitMQReceiverOptions`
+- `RabbitMQReceiverSubscription`, `RabbitMQReceiversConfig`
+- `IdempotentMessage`
+
+Фабрики:
+- `createReceiverConfig`, `createRetryConfig`, `createDLXConfig`
+
+Утилиты:
+- `RABBITMQ_SENDER_SERVICE` (Symbol для DI)
+
+## Важные замечания
+
+1. **Конфигурация**: Конфигурация должна создаваться в сервисе, который использует пакет, а не в самом пакете
+2. **Redis для идемпотентности**: Для полноценной работы идемпотентности **обязательно** необходимо подключить `RedisService` из пакета `@makebelieve21213-packages/redis-client` в вашем приложении. Без подключенного Redis интерцептор будет пропускать проверку идемпотентности (graceful degradation).
+3. **UnifiedExceptionFilter и UnifiedInterceptor**: Не устанавливаются автоматически - их необходимо установить вручную в `main.ts` перед вызовом `connectRabbitMQReceiver` или `connectRabbitMQReceivers`
+4. **Идемпотентность**: `publish()` автоматически добавляет `correlationId` и `correlationTimestamp` в сообщение, `fireAndForget()` не добавляет
+5. **Обработка ошибок**: Все ошибки обрабатываются через `UnifiedExceptionFilter` из `@makebelieve21213-packages/nest-common` (если установлен)
+6. **Retry механизм**: Работает автоматически через DLX механизм RabbitMQ с TTL
+7. **DLX очередь**: Единая глобальная DLX очередь для всех очередей (создается только один раз при первой подписке)
+
+## Тестирование
+
+Пакет имеет высокое покрытие тестами (>95% для веток, 100% для statements и функций). Все компоненты протестированы через Jest.
+
+## Зависимости
+
+- `@nestjs/common` - NestJS core
+- `@nestjs/config` - NestJS config (опционально, для async конфигурации)
+- `@nestjs/microservices` - NestJS microservices
+- `@makebelieve21213-packages/logger` - Логирование
+- `@makebelieve21213-packages/nest-common` - Общие компоненты NestJS (RpcError, UnifiedExceptionFilter, UnifiedInterceptor)
+- `@makebelieve21213-packages/redis-client` - Redis клиент для идемпотентности
+- `rxjs` - Реактивные расширения (lastValueFrom)
+- `uuid` - Генерация уникальных ID для correlationId
+- `reflect-metadata` - TypeScript decorators

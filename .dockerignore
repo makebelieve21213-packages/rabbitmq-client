@@ -1,0 +1,37 @@
+# Зависимости
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+
+# Build артефакты (генерируются при сборке в Docker)
+dist/
+coverage/
+
+# IDE и редакторы
+.cursor/
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+.husky/
+
+# Документация
+*.md
+llms.txt
+
+# Тесты и тестовые файлы
+**/*.spec.ts
+**/__tests__/
+**/__mocks__/
+jest.config.ts
+
+# TypeScript build info (кэш файлы)
+tsconfig.tsbuildinfo
+
+# Docker файлы (не нужны внутри образа)
+Dockerfile
+.dockerignore

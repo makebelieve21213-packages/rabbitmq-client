@@ -1,0 +1,10 @@
+# CODEOWNERS файл
+# Определяет владельцев кода для автоматического назначения ревьюеров
+# Подробнее: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Владелец всего проекта
+* @makebelieve21213
+
+# Специфичные владельцы для определенных директорий (если нужно)
+# /src/main/ @makebelieve21213 @another-reviewer
+# /src/config/ @makebelieve21213

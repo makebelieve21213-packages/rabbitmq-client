@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # Обновление npm зависимостей
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # Группировка обновлений по типу
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+    # Игнорирование определенных зависимостей (если нужно)
+    # ignore:
+    #   - dependency-name: "package-name"
+    #     update-types: ["version-update:semver-major"]
+
+  # Обновление GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "github-actions"
+      - "automated"

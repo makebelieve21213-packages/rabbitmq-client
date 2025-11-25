@@ -1,0 +1,74 @@
+name: Publish to NPM
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          # Убираем префикс 'v' если есть
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Update package.json version
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          npm pkg set version="$VERSION"
+          echo "Updated package.json version to $VERSION"
+
+      - name: Verify package.json
+        run: |
+          echo "Package name: $(npm pkg get name)"
+          echo "Package version: $(npm pkg get version)"
+
+      - name: Publish to NPM
+        run: |
+          echo "Publishing version ${{ steps.get_version.outputs.version }} to NPM..."
+          npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify publication
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          PACKAGE_NAME=$(npm pkg get name | tr -d '"')
+          echo "Verifying publication of $PACKAGE_NAME@$VERSION"
+          sleep 5
+          npm view "$PACKAGE_NAME@$VERSION" version || echo "Package may not be immediately available"

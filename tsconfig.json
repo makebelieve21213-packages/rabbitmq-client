@@ -1,0 +1,43 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"compilerOptions": {
+		// Базовые настройки для всего монорепо
+		"target": "ES2023",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2023"],
+
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+
+		// Строгая типизация
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"strictNullChecks": true,
+
+		// Поддержка декораторов для NestJS
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+
+		// Настройки для сборки
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"baseUrl": "./",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"composite": true,
+		"paths": {
+			"src/*": ["src/*"]
+		},
+		"types": ["jest", "node"]
+	},
+	"include": ["src/**/*.ts", "**/*.d.ts"],
+	"exclude": ["node_modules", "dist", "coverage"]
+}

@@ -1,0 +1,13 @@
+export { default as RabbitMQModule } from "src/main/rabbitmq.module";
+export { default as RabbitMQService } from "src/main/rabbitmq.service";
+export { default as connectRabbitMQReceiver } from "src/connect-rabbitmq-receiver";
+export { default as connectRabbitMQReceivers } from "src/connect-rabbitmq-receivers";
+export { default as RabbitMQIdempotencyInterceptor } from "src/interceptors/rabbitmq.interceptor";
+export { createDLXConfig, createReceiverConfig, createRetryConfig } from "src/config/factories";
+export type { default as RabbitMQModuleOptions } from "src/types/rabbitmq-module-options";
+export type { default as RabbitMQSenderOptions } from "src/types/rabbitmq-sender-options";
+export type { default as RabbitMQReceiverOptions } from "src/types/rabbitmq-receiver-options";
+export type { default as RabbitMQReceiverSubscription } from "src/types/rabbitmq-receiver-subscription";
+export type { default as RabbitMQReceiversConfig } from "src/types/rabbitmq-receivers-config";
+export type { default as IdempotentMessage } from "src/types/idempotent-message";
+export { ROUTING_KEYS } from "src/types/routing-keys";
