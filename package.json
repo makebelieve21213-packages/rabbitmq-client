@@ -55,7 +55,7 @@
 		"@makebelieve21213-packages/nest-common": "^1.1.3",
 		"@makebelieve21213-packages/redis-client": "^1.0.1",
 		"rxjs": "^7.8.2",
-		"uuid": "^11.1.0"
+		"uuid": "^13.0.0"
 	},
 	"devDependencies": {
 		"@nestjs/testing": "^11.1.6",
