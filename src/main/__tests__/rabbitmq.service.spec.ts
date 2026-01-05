@@ -7,7 +7,7 @@ import RabbitMQService from "src/main/rabbitmq.service";
 import { ROUTING_KEYS } from "src/types/routing-keys";
 import { RABBITMQ_SENDER_SERVICE } from "src/utils/injections";
 
-import type { ClientProxy } from "@nestjs/microservices";
+import type { ClientProxy, RmqRecordOptions } from "@nestjs/microservices";
 import type { TestingModule } from "@nestjs/testing";
 import type RabbitMQSenderOptions from "src/types/rabbitmq-sender-options";
 
@@ -439,6 +439,121 @@ describe("RabbitMQService", () => {
 			expect(result).toEqual(expectedResponse);
 			expect(result.success).toBe(true);
 			expect(result.result).toBe("processed");
+		});
+
+		it("должен отправить сообщение с заголовками когда options передан", async () => {
+			const testData = { input: "test" };
+			const expectedResponse = { output: "response" };
+			const routingKey = ROUTING_KEYS.ANALYTICS_GLOBAL;
+			const options: RmqRecordOptions = {
+				headers: {
+					"x-locale": "ru",
+					"x-request-id": "test-request-id",
+				},
+				priority: 5,
+			};
+
+			const observable = of(expectedResponse);
+			clientProxy.send.mockReturnValue(observable);
+			mockLastValueFrom.mockResolvedValue(expectedResponse);
+
+			await service.publish(routingKey, testData, options);
+
+			// Проверяем, что send был вызван с правильными параметрами
+			expect(clientProxy.send).toHaveBeenCalledWith(routingKey, expect.any(Object));
+
+			// Проверяем, что был использован RmqRecordBuilder
+			const sendCall = clientProxy.send.mock.calls[0];
+			const message = sendCall[1] as {
+				data: { input: string; correlationId: string; correlationTimestamp: number };
+				options: { headers: Record<string, string>; priority: number };
+			};
+
+			// RmqRecordBuilder создает объект с полями data и options
+			expect(message).toHaveProperty("data");
+			expect(message).toHaveProperty("options");
+			expect(message.options).toHaveProperty("headers");
+			expect(message.options.headers).toEqual(options.headers);
+			expect(message.options.priority).toBe(options.priority);
+
+			// Проверяем, что данные с correlationId находятся в data
+			expect(message.data).toHaveProperty("correlationId");
+			expect(message.data).toHaveProperty("correlationTimestamp");
+			expect(message.data.input).toBe("test");
+		});
+
+		it("должен отправить сообщение без заголовков когда options не передан (обратная совместимость)", async () => {
+			const testData = { input: "test" };
+			const expectedResponse = { output: "response" };
+			const routingKey = ROUTING_KEYS.ANALYTICS_GLOBAL;
+
+			const observable = of(expectedResponse);
+			clientProxy.send.mockReturnValue(observable);
+			mockLastValueFrom.mockResolvedValue(expectedResponse);
+
+			await service.publish(routingKey, testData);
+
+			// Проверяем, что send был вызван с простым объектом (без RmqRecordBuilder)
+			expect(clientProxy.send).toHaveBeenCalledWith(
+				routingKey,
+				expect.objectContaining({
+					...testData,
+					correlationId: expect.any(String),
+					correlationTimestamp: expect.any(Number),
+				})
+			);
+
+			// Проверяем, что НЕ был использован RmqRecordBuilder (нет полей data и options)
+			const sendCall = clientProxy.send.mock.calls[0];
+			const message = sendCall[1] as {
+				input: string;
+				correlationId: string;
+				correlationTimestamp: number;
+			};
+
+			expect(message).not.toHaveProperty("data");
+			expect(message).not.toHaveProperty("options");
+			expect(message).toHaveProperty("correlationId");
+			expect(message).toHaveProperty("correlationTimestamp");
+			expect(message.input).toBe("test");
+		});
+
+		it("должен корректно обработать options с несколькими заголовками и приоритетом", async () => {
+			const testData = { userId: 123 };
+			const expectedResponse = { success: true };
+			const routingKey = ROUTING_KEYS.TOKENS_FETCH_ALL;
+			const options: RmqRecordOptions = {
+				headers: {
+					"x-locale": "en",
+					"x-user-id": "123",
+					"x-request-id": "req-456",
+					"x-client-version": "1.0.0",
+				},
+				priority: 10,
+				messageId: "msg-789",
+			};
+
+			const observable = of(expectedResponse);
+			clientProxy.send.mockReturnValue(observable);
+			mockLastValueFrom.mockResolvedValue(expectedResponse);
+
+			await service.publish(routingKey, testData, options);
+
+			const sendCall = clientProxy.send.mock.calls[0];
+			const message = sendCall[1] as {
+				data: { userId: number; correlationId: string; correlationTimestamp: number };
+				options: {
+					headers: Record<string, string>;
+					priority: number;
+					messageId: string;
+				};
+			};
+
+			expect(message.options.headers).toEqual(options.headers);
+			expect(message.options.priority).toBe(options.priority);
+			expect(message.options.messageId).toBe(options.messageId);
+			expect(message.data.userId).toBe(123);
+			expect(message.data).toHaveProperty("correlationId");
 		});
 	});
 

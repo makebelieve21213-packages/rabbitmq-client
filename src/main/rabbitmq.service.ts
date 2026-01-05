@@ -1,13 +1,14 @@
 import { LoggerService } from "@makebelieve21213-packages/logger";
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ClientProxy } from "@nestjs/microservices";
+import { ClientProxy, RmqRecordBuilder } from "@nestjs/microservices";
 import { lastValueFrom } from "rxjs";
 import { createSenderConfig } from "src/config/factories";
 import { ROUTING_KEYS } from "src/types/routing-keys";
 import { RABBITMQ_SENDER_SERVICE } from "src/utils/injections";
 import { v4 as uuidv4 } from "uuid";
 
+import type { RmqRecordOptions } from "@nestjs/microservices";
 import type { MessageWithCorrelationId } from "src/types/message-with-correlation-id";
 import type RabbitMQSenderOptions from "src/types/rabbitmq-sender-options";
 
@@ -86,8 +87,9 @@ export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 	/**
 	 * Отправляем сообщение по указанному routingKey и ждем ответ от получателя (request-response паттерн)
 	 * Добавляем correlationId и correlationTimestamp для идемпотентности
+	 * Поддерживает передачу заголовков и других опций через параметр options
 	 */
-	async publish<I, O>(key: ROUTING_KEYS, data: I): Promise<O> {
+	async publish<I, O>(key: ROUTING_KEYS, data: I, options?: RmqRecordOptions): Promise<O> {
 		const messageWithCorrelation = this.addCorrelationId(data);
 		const routingKey = this.rk[key];
 
@@ -95,7 +97,18 @@ export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 			`publish [routingKey=${routingKey}, correlationId=${messageWithCorrelation.correlationId}, data=${JSON.stringify(data)}]`
 		);
 
-		const result = this.client.send<O>(routingKey, messageWithCorrelation);
+		let message: (I & MessageWithCorrelationId) | ReturnType<typeof RmqRecordBuilder.prototype.build>;
+
+		if (options) {
+			// Используем RmqRecordBuilder для создания записи с заголовками
+			const record = new RmqRecordBuilder(messageWithCorrelation).setOptions(options).build();
+			message = record;
+		} else {
+			// Используем простой dto без заголовков (обратная совместимость)
+			message = messageWithCorrelation;
+		}
+
+		const result = this.client.send<O>(routingKey, message);
 
 		return (await lastValueFrom(result)) as O;
 	}

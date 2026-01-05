@@ -1,6 +1,6 @@
 {
 	"name": "@makebelieve21213-packages/rabbitmq-client",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "RabbitMQ client module for NestJS microservices communication using message queues",
 	"type": "module",
 	"main": "./dist/index.js",
