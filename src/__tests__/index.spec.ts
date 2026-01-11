@@ -171,11 +171,16 @@ describe("Index экспорты", () => {
 			url: "amqp://localhost:5672",
 			exchange: "test_exchange",
 			exchangeType: "topic",
+			routingKeys: {
+				"test.key.1": "test.key.1",
+				"test.key.2": "test.key.2",
+			},
 		};
 
 		expect(testOptions).toBeDefined();
 		expect(testOptions.url).toBe("amqp://localhost:5672");
 		expect(testOptions.exchange).toBe("test_exchange");
+		expect(testOptions.routingKeys).toBeDefined();
 	});
 
 	it("должен экспортировать тип RabbitMQReceiverOptions", () => {

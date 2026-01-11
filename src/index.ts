@@ -11,4 +11,4 @@ export type { default as RabbitMQReceiverSubscription } from "src/types/rabbitmq
 export type { default as RabbitMQReceiversConfig } from "src/types/rabbitmq-receivers-config";
 export type { default as IdempotentMessage } from "src/types/idempotent-message";
 export type { RmqRecordOptions } from "@nestjs/microservices";
-export { ROUTING_KEYS } from "src/types/routing-keys";
+export type { RoutingKey, RoutingKeys } from "src/types/routing-keys";

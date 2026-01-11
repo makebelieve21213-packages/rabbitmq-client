@@ -4,18 +4,18 @@ import { ConfigService } from "@nestjs/config";
 import { ClientProxy, RmqRecordBuilder } from "@nestjs/microservices";
 import { lastValueFrom } from "rxjs";
 import { createSenderConfig } from "src/config/factories";
-import { ROUTING_KEYS } from "src/types/routing-keys";
 import { RABBITMQ_SENDER_SERVICE } from "src/utils/injections";
 import { v4 as uuidv4 } from "uuid";
 
 import type { RmqRecordOptions } from "@nestjs/microservices";
 import type { MessageWithCorrelationId } from "src/types/message-with-correlation-id";
+import type { RoutingKeys } from "src/types/routing-keys";
 import type RabbitMQSenderOptions from "src/types/rabbitmq-sender-options";
 
 // Сервис по отправке сообщений через RabbitMQ на другие сервисы
 @Injectable()
 export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
-	private readonly rk: Record<ROUTING_KEYS, ROUTING_KEYS>;
+	private readonly rk: RoutingKeys;
 
 	constructor(
 		@Inject(RABBITMQ_SENDER_SERVICE)
@@ -71,14 +71,20 @@ export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 	 * Отправляем сообщение по указанному routingKey используя fire-and-forget паттерн
 	 * Для fire-and-forget не добавляем correlationId, так как идемпотентность не требуется
 	 */
-	fireAndForget<I>(key: ROUTING_KEYS, data: I): void {
-		this.logger.log(`fireAndForget [routingKey=${this.rk[key]}, data=${JSON.stringify(data)}]`);
+	fireAndForget<I>(key: string, data: I): void {
+		const routingKey = this.rk[key];
+		if (!routingKey) {
+			this.logger.error(`Routing key "${key}" not found in configuration`);
+			return;
+		}
+
+		this.logger.log(`fireAndForget [routingKey=${routingKey}, data=${JSON.stringify(data)}]`);
 
 		// Подписываемся на Observable для гарантии отправки и обработки ошибок
-		this.client.emit(this.rk[key], data).subscribe({
+		this.client.emit(routingKey, data).subscribe({
 			error: (error: Error | unknown) => {
 				this.logger.error(
-					`Ошибка отправки fire-and-forget сообщения [routingKey=${this.rk[key]}]: ${error}`
+					`Ошибка отправки fire-and-forget сообщения [routingKey=${routingKey}]: ${error}`
 				);
 			},
 		});
@@ -88,10 +94,15 @@ export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 	 * Отправляем сообщение по указанному routingKey и ждем ответ от получателя (request-response паттерн)
 	 * Добавляем correlationId и correlationTimestamp для идемпотентности
 	 * Поддерживает передачу заголовков и других опций через параметр options
+	 * @param key - ключ маршрутизации из объекта routingKeys конфигурации
 	 */
-	async publish<I, O>(key: ROUTING_KEYS, data: I, options?: RmqRecordOptions): Promise<O> {
-		const messageWithCorrelation = this.addCorrelationId(data);
+	async publish<I, O>(key: string, data: I, options?: RmqRecordOptions): Promise<O> {
 		const routingKey = this.rk[key];
+		if (!routingKey) {
+			throw new Error(`Routing key "${key}" not found in configuration`);
+		}
+
+		const messageWithCorrelation = this.addCorrelationId(data);
 
 		this.logger.log(
 			`publish [routingKey=${routingKey}, correlationId=${messageWithCorrelation.correlationId}, data=${JSON.stringify(data)}]`

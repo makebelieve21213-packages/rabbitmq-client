@@ -4,7 +4,6 @@ import { Test } from "@nestjs/testing";
 import { lastValueFrom, of, throwError } from "rxjs";
 import { createSenderConfig } from "src/config/factories";
 import RabbitMQService from "src/main/rabbitmq.service";
-import { ROUTING_KEYS } from "src/types/routing-keys";
 import { RABBITMQ_SENDER_SERVICE } from "src/utils/injections";
 
 import type { ClientProxy, RmqRecordOptions } from "@nestjs/microservices";
@@ -31,36 +30,20 @@ describe("RabbitMQService", () => {
 	let configService: jest.Mocked<ConfigService>;
 	let loggerService: jest.Mocked<LoggerService>;
 
+	// Моковые routing keys для тестов
+	const mockRoutingKeys: Record<string, string> = {
+		"test.key.1": "test.key.1",
+		"test.key.2": "test.key.2",
+		"test.key.3": "test.key.3",
+		"test.key.4": "test.key.4",
+		"test.key.5": "test.key.5",
+	};
+
 	const mockSenderOptions: RabbitMQSenderOptions = {
 		url: "amqp://localhost:5672",
 		exchange: "test_exchange",
 		exchangeType: "topic",
-	};
-
-	const mockRoutingKeys = {
-		[ROUTING_KEYS.TOKENS_FETCH_ALL]: ROUTING_KEYS.TOKENS_FETCH_ALL,
-		[ROUTING_KEYS.TOKENS_FETCH_DETAILS_ETHEREUM]: ROUTING_KEYS.TOKENS_FETCH_DETAILS_ETHEREUM,
-		[ROUTING_KEYS.TOKENS_FETCH_DETAILS_NFT]: ROUTING_KEYS.TOKENS_FETCH_DETAILS_NFT,
-		[ROUTING_KEYS.TOKENS_DEPLOY_ETHEREUM]: ROUTING_KEYS.TOKENS_DEPLOY_ETHEREUM,
-		[ROUTING_KEYS.TOKENS_DEPLOY_NFT]: ROUTING_KEYS.TOKENS_DEPLOY_NFT,
-		[ROUTING_KEYS.ANALYTICS_GLOBAL]: ROUTING_KEYS.ANALYTICS_GLOBAL,
-		[ROUTING_KEYS.ANALYTICS_TOTAL_MARKET_CHART]: ROUTING_KEYS.ANALYTICS_TOTAL_MARKET_CHART,
-		[ROUTING_KEYS.ANALYTICS_MARKET_CHART]: ROUTING_KEYS.ANALYTICS_MARKET_CHART,
-		[ROUTING_KEYS.ANALYTICS_DOMINANCE_CHART]: ROUTING_KEYS.ANALYTICS_DOMINANCE_CHART,
-		[ROUTING_KEYS.ANALYTICS_VOLUME_CHART]: ROUTING_KEYS.ANALYTICS_VOLUME_CHART,
-		[ROUTING_KEYS.ANALYTICS_TOP_VOLUME_LEADERS]: ROUTING_KEYS.ANALYTICS_TOP_VOLUME_LEADERS,
-		[ROUTING_KEYS.ANALYTICS_TRENDING]: ROUTING_KEYS.ANALYTICS_TRENDING,
-		[ROUTING_KEYS.ANALYTICS_COINS_TABLE]: ROUTING_KEYS.ANALYTICS_COINS_TABLE,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL]: ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_TOTAL_MARKET_CHART]:
-			ROUTING_KEYS.ANALYTICS_UPDATE_TOTAL_MARKET_CHART,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_MARKET_CHART]: ROUTING_KEYS.ANALYTICS_UPDATE_MARKET_CHART,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_DOMINANCE_CHART]: ROUTING_KEYS.ANALYTICS_UPDATE_DOMINANCE_CHART,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_VOLUME_CHART]: ROUTING_KEYS.ANALYTICS_UPDATE_VOLUME_CHART,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_TOP_VOLUME_LEADERS]:
-			ROUTING_KEYS.ANALYTICS_UPDATE_TOP_VOLUME_LEADERS,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_TRENDING]: ROUTING_KEYS.ANALYTICS_UPDATE_TRENDING,
-		[ROUTING_KEYS.ANALYTICS_UPDATE_COINS_TABLE]: ROUTING_KEYS.ANALYTICS_UPDATE_COINS_TABLE,
+		routingKeys: mockRoutingKeys,
 	};
 
 	beforeEach(async () => {
@@ -139,8 +122,8 @@ describe("RabbitMQService", () => {
 
 		it("должен использовать routing keys из вычисленной конфигурации", () => {
 			const testData = { test: "data" };
-			service.fireAndForget(ROUTING_KEYS.TOKENS_FETCH_ALL, testData);
-			expect(clientProxy.emit).toHaveBeenCalledWith(ROUTING_KEYS.TOKENS_FETCH_ALL, testData);
+			service.fireAndForget("test.key.1", testData);
+			expect(clientProxy.emit).toHaveBeenCalledWith("test.key.1", testData);
 		});
 
 		it("должен правильно инициализировать все параметры конструктора", () => {
@@ -209,14 +192,14 @@ describe("RabbitMQService", () => {
 
 			// Проверяем, что client используется через вызов fireAndForget
 			const testData = { test: "data" };
-			testService.fireAndForget(ROUTING_KEYS.TOKENS_FETCH_ALL, testData);
-			expect(testClientProxy.emit).toHaveBeenCalledWith(ROUTING_KEYS.TOKENS_FETCH_ALL, testData);
+			testService.fireAndForget("test.key.1", testData);
+			expect(testClientProxy.emit).toHaveBeenCalledWith("test.key.1", testData);
 
 			// Проверяем, что client используется через вызов publish
 			const observable = of({ result: "success" });
 			testClientProxy.send.mockReturnValue(observable);
 			mockLastValueFrom.mockResolvedValue({ result: "success" });
-			await testService.publish(ROUTING_KEYS.TOKENS_FETCH_DETAILS_ETHEREUM, testData);
+			await testService.publish("test.key.2", testData);
 			expect(testClientProxy.send).toHaveBeenCalled();
 
 			// Проверяем, что client используется через вызов onModuleDestroy
@@ -264,7 +247,7 @@ describe("RabbitMQService", () => {
 	describe("fireAndForget", () => {
 		it("должен отправить сообщение без ожидания ответа", () => {
 			const testData = { test: "data" };
-			const routingKey = ROUTING_KEYS.TOKENS_FETCH_ALL;
+			const routingKey = "test.key.1";
 
 			service.fireAndForget(routingKey, testData);
 
@@ -276,7 +259,7 @@ describe("RabbitMQService", () => {
 
 		it("должен корректно обработать пустые данные", () => {
 			const testData = {};
-			const routingKey = ROUTING_KEYS.ANALYTICS_GLOBAL;
+			const routingKey = "test.key.2";
 
 			service.fireAndForget(routingKey, testData);
 
@@ -292,7 +275,7 @@ describe("RabbitMQService", () => {
 				array: [1, 2, 3],
 				boolean: true,
 			};
-			const routingKey = ROUTING_KEYS.TOKENS_DEPLOY_ETHEREUM;
+			const routingKey = "test.key.3";
 
 			service.fireAndForget(routingKey, testData);
 
@@ -304,7 +287,7 @@ describe("RabbitMQService", () => {
 
 		it("должен обработать ошибку отправки через subscribe", () => {
 			const testData = { test: "data" };
-			const routingKey = ROUTING_KEYS.TOKENS_FETCH_ALL;
+			const routingKey = "test.key.1";
 			const error = new Error("Emit failed");
 
 			clientProxy.emit.mockReturnValue(throwError(() => error));
@@ -314,13 +297,28 @@ describe("RabbitMQService", () => {
 			expect(loggerService.log).toHaveBeenCalled();
 			expect(clientProxy.emit).toHaveBeenCalledWith(routingKey, testData);
 		});
+
+		it("должен залогировать ошибку и не отправлять сообщение если routing key не найден", () => {
+			const testData = { test: "data" };
+			const nonExistentKey = "non.existent.key";
+
+			service.fireAndForget(nonExistentKey, testData);
+
+			expect(loggerService.error).toHaveBeenCalledWith(
+				`Routing key "${nonExistentKey}" not found in configuration`
+			);
+			expect(clientProxy.emit).not.toHaveBeenCalled();
+			expect(loggerService.log).not.toHaveBeenCalledWith(
+				expect.stringContaining("fireAndForget")
+			);
+		});
 	});
 
 	describe("publish", () => {
 		it("должен отправить сообщение с correlationId и вернуть ответ", async () => {
 			const testData = { input: "test" };
 			const expectedResponse = { output: "response" };
-			const routingKey = ROUTING_KEYS.TOKENS_FETCH_DETAILS_ETHEREUM;
+			const routingKey = "test.key.2";
 
 			const observable = of(expectedResponse);
 			clientProxy.send.mockReturnValue(observable);
@@ -350,7 +348,7 @@ describe("RabbitMQService", () => {
 		it("должен добавить correlationId и correlationTimestamp к сообщению", async () => {
 			const testData = { input: "test" };
 			const expectedResponse = { output: "response" };
-			const routingKey = ROUTING_KEYS.TOKENS_FETCH_DETAILS_NFT;
+			const routingKey = "test.key.3";
 
 			const observable = of(expectedResponse);
 			clientProxy.send.mockReturnValue(observable);
@@ -375,7 +373,7 @@ describe("RabbitMQService", () => {
 		it("должен обработать необъектные данные, обернув их в объект", async () => {
 			const testData = "string data";
 			const expectedResponse = { output: "response" };
-			const routingKey = ROUTING_KEYS.ANALYTICS_GLOBAL;
+			const routingKey = "test.key.2";
 
 			const observable = of(expectedResponse);
 			clientProxy.send.mockReturnValue(observable);
@@ -397,7 +395,7 @@ describe("RabbitMQService", () => {
 
 		it("должен передать ошибку при неудачной отправке", async () => {
 			const testData = { input: "test" };
-			const routingKey = ROUTING_KEYS.TOKENS_FETCH_DETAILS_NFT;
+			const routingKey = "test.key.3";
 			const error = new Error("Send failed");
 
 			const observable = throwError(() => error);
@@ -428,7 +426,7 @@ describe("RabbitMQService", () => {
 				success: true,
 				result: "processed",
 			};
-			const routingKey = ROUTING_KEYS.ANALYTICS_TRENDING;
+			const routingKey = "test.key.4";
 
 			const observable = of(expectedResponse);
 			clientProxy.send.mockReturnValue(observable);
@@ -444,7 +442,7 @@ describe("RabbitMQService", () => {
 		it("должен отправить сообщение с заголовками когда options передан", async () => {
 			const testData = { input: "test" };
 			const expectedResponse = { output: "response" };
-			const routingKey = ROUTING_KEYS.ANALYTICS_GLOBAL;
+			const routingKey = "test.key.2";
 			const options: RmqRecordOptions = {
 				headers: {
 					"x-locale": "ru",
@@ -485,7 +483,7 @@ describe("RabbitMQService", () => {
 		it("должен отправить сообщение без заголовков когда options не передан (обратная совместимость)", async () => {
 			const testData = { input: "test" };
 			const expectedResponse = { output: "response" };
-			const routingKey = ROUTING_KEYS.ANALYTICS_GLOBAL;
+			const routingKey = "test.key.2";
 
 			const observable = of(expectedResponse);
 			clientProxy.send.mockReturnValue(observable);
@@ -521,7 +519,7 @@ describe("RabbitMQService", () => {
 		it("должен корректно обработать options с несколькими заголовками и приоритетом", async () => {
 			const testData = { userId: 123 };
 			const expectedResponse = { success: true };
-			const routingKey = ROUTING_KEYS.TOKENS_FETCH_ALL;
+			const routingKey = "test.key.1";
 			const options: RmqRecordOptions = {
 				headers: {
 					"x-locale": "en",
@@ -555,19 +553,31 @@ describe("RabbitMQService", () => {
 			expect(message.data.userId).toBe(123);
 			expect(message.data).toHaveProperty("correlationId");
 		});
+
+		it("должен выбросить ошибку если routing key не найден в конфигурации", async () => {
+			const testData = { input: "test" };
+			const nonExistentKey = "non.existent.key";
+
+			await expect(service.publish(nonExistentKey, testData)).rejects.toThrow(
+				`Routing key "${nonExistentKey}" not found in configuration`
+			);
+
+			expect(clientProxy.send).not.toHaveBeenCalled();
+			expect(mockLastValueFrom).not.toHaveBeenCalled();
+		});
 	});
 
 	describe("интеграция routing keys", () => {
 		it("должен использовать правильные routing keys для всех типов операций", () => {
 			const testData = { test: "data" };
 
-			// Тестируем все routing keys
-			Object.values(ROUTING_KEYS).forEach((routingKey) => {
+			// Тестируем все routing keys из моковой конфигурации
+			Object.keys(mockRoutingKeys).forEach((routingKey) => {
 				service.fireAndForget(routingKey, testData);
-				expect(clientProxy.emit).toHaveBeenCalledWith(routingKey, testData);
+				expect(clientProxy.emit).toHaveBeenCalledWith(mockRoutingKeys[routingKey], testData);
 			});
 
-			expect(clientProxy.emit).toHaveBeenCalledTimes(Object.values(ROUTING_KEYS).length);
+			expect(clientProxy.emit).toHaveBeenCalledTimes(Object.keys(mockRoutingKeys).length);
 		});
 	});
 
@@ -579,9 +589,9 @@ describe("RabbitMQService", () => {
 
 		it("должен использовать вычисленные routing keys для отправки сообщений", () => {
 			const testData = { test: "data" };
-			service.fireAndForget(ROUTING_KEYS.TOKENS_FETCH_ALL, testData);
+			service.fireAndForget("test.key.1", testData);
 
-			expect(clientProxy.emit).toHaveBeenCalledWith(ROUTING_KEYS.TOKENS_FETCH_ALL, testData);
+			expect(clientProxy.emit).toHaveBeenCalledWith("test.key.1", testData);
 		});
 	});
 });

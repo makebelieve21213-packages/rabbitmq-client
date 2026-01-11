@@ -1,5 +1,5 @@
 import type RabbitMQConfigBase from "src/types/base.config";
-import type { ROUTING_KEYS } from "src/types/routing-keys";
+import type { RoutingKeys } from "src/types/routing-keys";
 
 // Тип конфигурации для sender RabbitMQ
 export default interface RabbitMQConfigSender extends Omit<RabbitMQConfigBase, "options"> {
@@ -11,5 +11,5 @@ export default interface RabbitMQConfigSender extends Omit<RabbitMQConfigBase, "
 			autoDelete: boolean;
 		};
 	};
-	routingKeys: Record<ROUTING_KEYS, ROUTING_KEYS>;
+	routingKeys: RoutingKeys;
 }

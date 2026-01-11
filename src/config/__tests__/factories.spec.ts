@@ -5,16 +5,23 @@ import {
 	createRetryConfig,
 	createDLXConfig,
 } from "src/config/factories";
-import { ROUTING_KEYS } from "src/types/routing-keys";
 
 import type RabbitMQReceiverOptions from "src/types/rabbitmq-receiver-options";
 import type RabbitMQSenderOptions from "src/types/rabbitmq-sender-options";
 
 describe("RabbitMQ Config Factories", () => {
+	// Моковые routing keys для тестов
+	const mockRoutingKeys = {
+		"test.key.1": "test.key.1",
+		"test.key.2": "test.key.2",
+		"test.key.3": "test.key.3",
+	};
+
 	const baseSenderOptions: RabbitMQSenderOptions = {
 		url: "amqp://localhost:5672",
 		exchange: "events_exchange",
 		exchangeType: "topic",
+		routingKeys: mockRoutingKeys,
 	};
 
 	const baseReceiverOptions: RabbitMQReceiverOptions = {
@@ -41,8 +48,21 @@ describe("RabbitMQ Config Factories", () => {
 			const config = createSenderConfig(baseSenderOptions);
 
 			expect(config.routingKeys).toBeDefined();
-			expect(config.routingKeys[ROUTING_KEYS.TOKENS_FETCH_ALL]).toBe(ROUTING_KEYS.TOKENS_FETCH_ALL);
-			expect(config.routingKeys[ROUTING_KEYS.ANALYTICS_GLOBAL]).toBeDefined();
+			expect(config.routingKeys["test.key.1"]).toBe("test.key.1");
+			expect(config.routingKeys["test.key.2"]).toBe("test.key.2");
+			expect(config.routingKeys).toEqual(mockRoutingKeys);
+		});
+
+		it("должен выбросить ошибку если routingKeys не переданы", () => {
+			const optionsWithoutRoutingKeys = {
+				url: "amqp://localhost:5672",
+				exchange: "events_exchange",
+				exchangeType: "topic",
+			} as unknown as RabbitMQSenderOptions;
+
+			expect(() => createSenderConfig(optionsWithoutRoutingKeys)).toThrow(
+				"routingKeys is required in RabbitMQ sender configuration"
+			);
 		});
 
 		it("должен использовать дефолтные replyQueueOptions если не указаны", () => {

@@ -130,6 +130,13 @@ const rabbitmqConfig = registerAs<RabbitMQConfiguration>(
       url: process.env[EnvVariable.RABBITMQ_URL]!,
       exchange: process.env[EnvVariable.RABBITMQ_EXCHANGE] || "events_exchange",
       exchangeType: process.env[EnvVariable.RABBITMQ_EXCHANGE_TYPE] || "topic",
+      // Обязательный объект routing keys - ключи определяются в вашем проекте
+      routingKeys: {
+        "tokens.fetch.all": "tokens.fetch.all",
+        "analytics.global": "analytics.global",
+        "analytics.update.global": "analytics.update.global",
+        // Добавьте все необходимые routing keys из вашего проекта
+      },
     },
     receiver: {
       url: process.env[EnvVariable.RABBITMQ_URL]!,
@@ -215,21 +222,22 @@ bootstrap();
 // your.service.ts
 import { Injectable } from '@nestjs/common';
 import { RabbitMQService } from '@makebelieve21213-packages/rabbitmq-client';
-import { ROUTING_KEYS } from '@makebelieve21213-packages/rabbitmq-client';
 
 @Injectable()
 export class YourService {
   constructor(private readonly rabbitMQ: RabbitMQService) {}
 
   async sendFireAndForget() {
-    await this.rabbitMQ.fireAndForget(ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL, {
+    // Используйте ключи из объекта routingKeys, переданного в конфигурации
+    await this.rabbitMQ.fireAndForget("analytics.update.global", {
       data: "example"
     });
   }
 
   async sendRequestResponse() {
+    // Используйте ключи из объекта routingKeys, переданного в конфигурации
     const result = await this.rabbitMQ.publish<RequestData, ResponseData>(
-      ROUTING_KEYS.ANALYTICS_GLOBAL,
+      "analytics.global",
       { query: "analytics" }
     );
     return result;
@@ -257,20 +265,29 @@ RabbitMQModule.forRootAsync<[RabbitMQConfiguration]>({
 
 **Методы:**
 
-#### `fireAndForget<I>(key: ROUTING_KEYS, data: I)`
+#### `fireAndForget<I>(key: string, data: I)`
 
 Отправляет сообщение без ожидания ответа (fire-and-forget паттерн). Не добавляет `correlationId`.
 
+**Параметры:**
+- `key` - ключ маршрутизации из объекта `routingKeys`, переданного в конфигурации
+- `data` - данные для отправки
+
 ```typescript
-fireAndForget<I>(key: ROUTING_KEYS, data: I): void
+fireAndForget<I>(key: string, data: I): void
 ```
 
-#### `publish<I, O>(key: ROUTING_KEYS, data: I): Promise<O>`
+#### `publish<I, O>(key: string, data: I, options?: RmqRecordOptions): Promise<O>`
 
 Отправляет сообщение и ожидает ответ (RPC паттерн). Автоматически добавляет `correlationId` и `correlationTimestamp` для идемпотентности.
 
+**Параметры:**
+- `key` - ключ маршрутизации из объекта `routingKeys`, переданного в конфигурации
+- `data` - данные для отправки
+- `options` (опционально) - опции для передачи заголовков и других метаданных
+
 ```typescript
-publish<I, O>(key: ROUTING_KEYS, data: I): Promise<O>
+publish<I, O>(key: string, data: I, options?: RmqRecordOptions): Promise<O>
 ```
 
 ### connectRabbitMQReceiver
@@ -316,7 +333,8 @@ connectRabbitMQReceivers(
 ### Отправка fire-and-forget сообщения
 
 ```typescript
-await this.rabbitMQ.fireAndForget(ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL, {
+// Используйте ключи из объекта routingKeys, переданного в конфигурации
+await this.rabbitMQ.fireAndForget("analytics.update.global", {
   data: "example"
 });
 ```
@@ -324,11 +342,28 @@ await this.rabbitMQ.fireAndForget(ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL, {
 ### Отправка request-response сообщения
 
 ```typescript
+// Используйте ключи из объекта routingKeys, переданного в конфигурации
 const result = await this.rabbitMQ.publish<RequestData, ResponseData>(
-  ROUTING_KEYS.ANALYTICS_GLOBAL,
+  "analytics.global",
   { query: "analytics" }
 );
 console.log(result);
+```
+
+### Отправка сообщения с заголовками
+
+```typescript
+const result = await this.rabbitMQ.publish<RequestData, ResponseData>(
+  "analytics.global",
+  { query: "analytics" },
+  {
+    headers: {
+      "x-locale": "ru",
+      "x-request-id": "unique-request-id",
+    },
+    priority: 5,
+  }
+);
 ```
 
 ### Создание обработчика сообщений
@@ -336,12 +371,12 @@ console.log(result);
 ```typescript
 import { Controller } from "@nestjs/common";
 import { MessagePattern, RmqContext, Ctx } from "@nestjs/microservices";
-import { ROUTING_KEYS } from "@makebelieve21213-packages/types";
 import { RpcError, RpcErrorType } from "@makebelieve21213-packages/nest-common";
 
 @Controller()
 export class MessageController {
-  @MessagePattern(ROUTING_KEYS.TOKENS_FETCH_ALL)
+  // Используйте строковые ключи, соответствующие ключам в routingKeys конфигурации
+  @MessagePattern("tokens.fetch.all")
   async handleTokenFetch(data: unknown, @Ctx() context: RmqContext) {
     try {
       // Ваша логика обработки
@@ -414,6 +449,8 @@ interface RabbitMQSenderOptions {
   url: string;                    // URL подключения к RabbitMQ
   exchange: string;               // Имя основного exchange
   exchangeType: string;            // Тип exchange (обычно "topic")
+  routingKeys: Record<string, string>; // Обязательный объект routing keys
+                                    // Ключи определяются в вашем проекте, не в пакете
   replyQueueOptions?: {           // Опции для reply очередей RPC паттерна
     durable?: boolean;             // По умолчанию: false
     autoDelete?: boolean;          // По умолчанию: true

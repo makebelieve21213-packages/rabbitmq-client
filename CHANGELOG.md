@@ -5,6 +5,31 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и этот проект придерживается [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.0.2] - 2026-01-11
+
+### Изменено
+- **BREAKING CHANGE**: Удален enum `ROUTING_KEYS` из пакета
+- Routing keys теперь передаются через конфигурацию `RabbitMQSenderOptions.routingKeys`
+- Методы `fireAndForget` и `publish` теперь принимают строковые ключи вместо enum
+- Типы `RoutingKey` и `RoutingKeys` экспортируются для использования в проектах
+- Пакет больше не содержит захардкоженных routing keys - все ключи определяются в проекте
+
+### Удалено
+- Enum `ROUTING_KEYS` - больше не экспортируется из пакета
+- Хардкод routing keys в функции `createSenderConfig`
+
+### Добавлено
+- Тип `RoutingKey` для представления отдельного ключа маршрутизации
+- Тип `RoutingKeys` для представления объекта routing keys
+- Валидация наличия routing keys в конфигурации с выбросом ошибки при отсутствии
+- Проверка существования routing key при отправке сообщений
+
+### Миграция
+Для миграции на новую версию:
+1. Добавьте поле `routingKeys` в конфигурацию `RabbitMQSenderOptions`
+2. Замените использование `ROUTING_KEYS` enum на строковые ключи из вашего проекта
+3. Обновите вызовы `fireAndForget` и `publish` для использования строковых ключей
+
 ## [1.0.1] - 2026-01-05
 
 ### Добавлено
