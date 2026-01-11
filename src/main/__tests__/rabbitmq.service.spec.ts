@@ -308,9 +308,7 @@ describe("RabbitMQService", () => {
 				`Routing key "${nonExistentKey}" not found in configuration`
 			);
 			expect(clientProxy.emit).not.toHaveBeenCalled();
-			expect(loggerService.log).not.toHaveBeenCalledWith(
-				expect.stringContaining("fireAndForget")
-			);
+			expect(loggerService.log).not.toHaveBeenCalledWith(expect.stringContaining("fireAndForget"));
 		});
 	});
 

@@ -9,8 +9,8 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { RmqRecordOptions } from "@nestjs/microservices";
 import type { MessageWithCorrelationId } from "src/types/message-with-correlation-id";
-import type { RoutingKeys } from "src/types/routing-keys";
 import type RabbitMQSenderOptions from "src/types/rabbitmq-sender-options";
+import type { RoutingKeys } from "src/types/routing-keys";
 
 // Сервис по отправке сообщений через RabbitMQ на другие сервисы
 @Injectable()
