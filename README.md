@@ -17,6 +17,7 @@ RabbitMQ клиент для NestJS с поддержкой TypeScript и пол
 ## 🚀 Возможности
 
 - ✅ **NestJS интеграция** - глобальный модуль с forRootAsync для простой интеграции
+- ✅ **CustomServerRMQ** - расширение ServerRMQ с улучшенным логированием и поддержкой явного указания routing keys
 - ✅ **Type-safe API** - полная типобезопасность TypeScript с экспортируемыми типами
 - ✅ **Отправка и получение сообщений** - поддержка fire-and-forget и request-response паттернов
 - ✅ **Идемпотентность** - автоматическая проверка дубликатов сообщений через Redis
@@ -59,6 +60,7 @@ npm install @makebelieve21213-packages/rabbitmq-client
 ```
 src/
 ├── main/                           # NestJS модуль и сервисы
+├── server/                         # CustomServerRMQ (расширение ServerRMQ)
 ├── config/                         # Фабрики конфигураций
 ├── types/                          # TypeScript типы
 ├── utils/                          # Утилиты
@@ -74,6 +76,7 @@ src/
 **Основные компоненты:**
 - `RabbitMQModule` - NestJS глобальный модуль для отправки
 - `RabbitMQService` - сервис для отправки сообщений
+- `CustomServerRMQ` - расширение `ServerRMQ` для `connectMicroservice` с улучшенным логированием
 - `connectRabbitMQReceiver` - функция подключения одной подписки
 - `connectRabbitMQReceivers` - функция подключения множественных подписок
 - `RabbitMQIdempotencyInterceptor` - интерцептор для проверки идемпотентности
@@ -322,6 +325,40 @@ connectRabbitMQReceivers(
 - `app` - экземпляр NestJS приложения
 - `receiverOptionsList` - массив опций для настройки receivers
 
+### CustomServerRMQ
+
+Расширение `ServerRMQ` из `@nestjs/microservices` с улучшенным логированием отключений и поддержкой явного указания routing keys через `options.pattern` (comma-separated строка).
+
+Используется вместо `connectRabbitMQReceiver`, когда нужно подключать RabbitMQ через `app.connectMicroservice()`:
+
+```typescript
+import { NestFactory } from "@nestjs/core";
+import { CustomServerRMQ } from "@makebelieve21213-packages/rabbitmq-client";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice({
+    strategy: new CustomServerRMQ({
+      urls: [process.env.RABBITMQ_URL],
+      queue: process.env.RABBITMQ_QUEUE,
+      queueOptions: { durable: true },
+      exchange: process.env.RABBITMQ_EXCHANGE,
+      exchangeType: "topic",
+      wildcards: true,
+      pattern: "tokens.fetch.all,analytics.global,analytics.update.global", // явные routing keys
+    }),
+  });
+
+  await app.startAllMicroservices();
+  await app.listen(3000);
+}
+```
+
+**Опции:**
+- `pattern` (опционально) - comma-separated строка routing keys для bind; если не указано, используются ключи из зарегистрированных `@MessagePattern` обработчиков
+
 ### RabbitMQIdempotencyInterceptor
 
 Глобальный интерцептор для проверки идемпотентности сообщений. Устанавливается автоматически в `connectRabbitMQReceiver` (если `skipGlobalSetup = false`).
@@ -388,6 +425,34 @@ export class MessageController {
       );
     }
   }
+}
+```
+
+### Использование CustomServerRMQ через connectMicroservice
+
+```typescript
+// main.ts
+import { NestFactory } from "@nestjs/core";
+import { CustomServerRMQ } from "@makebelieve21213-packages/rabbitmq-client";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice({
+    strategy: new CustomServerRMQ({
+      urls: [process.env.RABBITMQ_URL!],
+      queue: process.env.RABBITMQ_QUEUE!,
+      queueOptions: { durable: true },
+      exchange: process.env.RABBITMQ_EXCHANGE || "events_exchange",
+      exchangeType: "topic",
+      wildcards: true,
+      pattern: "tokens.fetch.all,analytics.global",
+    }),
+  });
+
+  await app.startAllMicroservices();
+  await app.listen(3000);
 }
 ```
 

@@ -7,6 +7,7 @@ import {
 import OriginalConnectRabbitMQReceiver from "src/connect-rabbitmq-receiver";
 import OriginalConnectRabbitMQReceivers from "src/connect-rabbitmq-receivers";
 import {
+	CustomServerRMQ,
 	RabbitMQIdempotencyInterceptor,
 	RabbitMQModule,
 	RabbitMQService,
@@ -25,8 +26,15 @@ import {
 import OriginalRabbitMQIdempotencyInterceptor from "src/interceptors/rabbitmq.interceptor";
 import OriginalRabbitMQModule from "src/main/rabbitmq.module";
 import OriginalRabbitMQService from "src/main/rabbitmq.service";
+import OriginalCustomServerRMQ from "src/server/custom-server-rmq";
 
 describe("Index экспорты", () => {
+	it("должен экспортировать CustomServerRMQ", () => {
+		expect(CustomServerRMQ).toBeDefined();
+		expect(typeof CustomServerRMQ).toBe("function");
+		expect(CustomServerRMQ).toBe(OriginalCustomServerRMQ);
+	});
+
 	it("должен экспортировать RabbitMQModule", () => {
 		expect(RabbitMQModule).toBeDefined();
 		expect(typeof RabbitMQModule).toBe("function");
@@ -78,6 +86,7 @@ describe("Index экспорты", () => {
 	it("должен экспортировать все основные компоненты пакета", () => {
 		// Проверяем, что все основные экспорты доступны
 		const exports = {
+			CustomServerRMQ,
 			RabbitMQModule,
 			RabbitMQService,
 			connectRabbitMQReceiver,
@@ -88,7 +97,7 @@ describe("Index экспорты", () => {
 			createRetryConfig,
 		};
 
-		expect(Object.keys(exports)).toHaveLength(8);
+		expect(Object.keys(exports)).toHaveLength(9);
 		Object.values(exports).forEach((exportedItem) => {
 			expect(exportedItem).toBeDefined();
 			expect(typeof exportedItem).toBe("function");

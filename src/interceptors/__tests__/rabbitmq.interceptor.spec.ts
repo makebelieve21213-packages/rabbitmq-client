@@ -62,6 +62,30 @@ describe("RabbitMQIdempotencyInterceptor", () => {
 	});
 
 	describe("constructor", () => {
+		it("должен выполнить конструктор (строка 19) при создании экземпляра с redisService и logger", () => {
+			const testRedisService = {
+				get: jest.fn(),
+				set: jest.fn(),
+				del: jest.fn(),
+			} as unknown as jest.Mocked<RedisClientService>;
+
+			const testLoggerInstance = {
+				log: jest.fn(),
+				error: jest.fn(),
+				warn: jest.fn(),
+				debug: jest.fn(),
+				setContext: jest.fn(),
+			} as unknown as jest.Mocked<LoggerService>;
+
+			(LoggerService as jest.Mock).mockImplementation(() => testLoggerInstance);
+
+			expect(() => {
+				new RabbitMQIdempotencyInterceptor(testRedisService, testLoggerInstance);
+			}).not.toThrow();
+
+			expect(testLoggerInstance.setContext).toHaveBeenCalledWith("RabbitMQIdempotencyInterceptor");
+		});
+
 		it("должен инициализировать интерцептор с redisService и установить контекст логгера", (done) => {
 			const testRedisService = {
 				get: jest.fn(),
@@ -842,6 +866,36 @@ describe("RabbitMQIdempotencyInterceptor", () => {
 		it("должен вернуть false для объекта с correlationId равным null", () => {
 			const message = {
 				correlationId: null,
+				data: "test",
+			};
+
+			const result = (
+				interceptor as unknown as {
+					hasCorrelationId: (data: unknown) => boolean;
+				}
+			).hasCorrelationId(message);
+
+			expect(result).toBe(false);
+		});
+
+		it("должен вернуть false для объекта с correlationId-функцией", () => {
+			const message = {
+				correlationId: () => "id",
+				data: "test",
+			};
+
+			const result = (
+				interceptor as unknown as {
+					hasCorrelationId: (data: unknown) => boolean;
+				}
+			).hasCorrelationId(message);
+
+			expect(result).toBe(false);
+		});
+
+		it("должен вернуть false для объекта с correlationId-символом", () => {
+			const message = {
+				correlationId: Symbol("id"),
 				data: "test",
 			};
 

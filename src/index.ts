@@ -1,3 +1,4 @@
+export { default as CustomServerRMQ } from "src/server/custom-server-rmq";
 export { default as RabbitMQModule } from "src/main/rabbitmq.module";
 export { default as RabbitMQService } from "src/main/rabbitmq.service";
 export { default as connectRabbitMQReceiver } from "src/connect-rabbitmq-receiver";

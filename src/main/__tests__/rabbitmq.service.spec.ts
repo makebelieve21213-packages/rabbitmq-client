@@ -106,6 +106,40 @@ describe("RabbitMQService", () => {
 	});
 
 	describe("конструктор", () => {
+		it("должен выполнить конструктор (строки 22-23) с client и configService", () => {
+			const testClient = {
+				connect: jest.fn().mockResolvedValue(undefined),
+				close: jest.fn().mockResolvedValue(undefined),
+				emit: jest.fn().mockReturnValue(of(undefined)),
+				send: jest.fn().mockReturnValue(of({})),
+			} as unknown as jest.Mocked<ClientProxy>;
+
+			const testConfigService = {
+				get: jest.fn().mockReturnValue(mockSenderOptions),
+			} as unknown as jest.Mocked<ConfigService>;
+
+			const testLogger = {
+				setContext: jest.fn(),
+				log: jest.fn(),
+				info: jest.fn(),
+				error: jest.fn(),
+				warn: jest.fn(),
+			} as unknown as jest.Mocked<LoggerService>;
+
+			mockCreateSenderConfig.mockReturnValue({
+				transport: {} as never,
+				options: {} as never,
+				routingKeys: mockRoutingKeys,
+			});
+
+			expect(() => {
+				new RabbitMQService(testClient, testConfigService, testLogger);
+			}).not.toThrow();
+
+			expect(testConfigService.get).toHaveBeenCalledWith("rabbitmqSender");
+			expect(testLogger.setContext).toHaveBeenCalledWith("RabbitMQService");
+		});
+
 		it("должен инициализировать сервис с правильными зависимостями", () => {
 			expect(service).toBeDefined();
 			expect(configService.get).toHaveBeenCalledWith("rabbitmqSender");
@@ -389,6 +423,48 @@ describe("RabbitMQService", () => {
 			expect(messageWithCorrelation.correlationId).toBeDefined();
 			expect(messageWithCorrelation.correlationTimestamp).toBeDefined();
 			expect(messageWithCorrelation.data).toBe("string data");
+		});
+
+		it("должен обработать null и обернуть в объект с data", async () => {
+			const expectedResponse = { output: "response" };
+			const routingKey = "test.key.2";
+
+			const observable = of(expectedResponse);
+			clientProxy.send.mockReturnValue(observable);
+			mockLastValueFrom.mockResolvedValue(expectedResponse);
+
+			await service.publish(routingKey, null);
+
+			const sendCall = clientProxy.send.mock.calls[0];
+			const messageWithCorrelation = sendCall[1] as {
+				correlationId: string;
+				correlationTimestamp: number;
+				data: null;
+			};
+
+			expect(messageWithCorrelation.correlationId).toBeDefined();
+			expect(messageWithCorrelation.correlationTimestamp).toBeDefined();
+			expect(messageWithCorrelation.data).toBeNull();
+		});
+
+		it("должен обработать число и обернуть в объект", async () => {
+			const expectedResponse = { output: "response" };
+			const routingKey = "test.key.2";
+
+			const observable = of(expectedResponse);
+			clientProxy.send.mockReturnValue(observable);
+			mockLastValueFrom.mockResolvedValue(expectedResponse);
+
+			await service.publish(routingKey, 42);
+
+			const sendCall = clientProxy.send.mock.calls[0];
+			const messageWithCorrelation = sendCall[1] as {
+				correlationId: string;
+				correlationTimestamp: number;
+				data: number;
+			};
+
+			expect(messageWithCorrelation.data).toBe(42);
 		});
 
 		it("должен передать ошибку при неудачной отправке", async () => {

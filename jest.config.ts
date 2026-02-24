@@ -44,6 +44,9 @@ const config: JestConfigWithTsJest = {
 		// Мокирование ES модулей из @makebelieve21213-packages
 		'^@makebelieve21213-packages/logger$': '<rootDir>/src/__tests__/__mocks__/logger.ts',
 		'^@makebelieve21213-packages/redis-client$': '<rootDir>/src/__tests__/__mocks__/redis-client.ts',
+		// Мокирование RabbitMQ пакетов для CustomServerRMQ тестов
+		'^amqplib$': '<rootDir>/src/__tests__/__mocks__/amqplib.ts',
+		'^amqp-connection-manager$': '<rootDir>/src/__tests__/__mocks__/amqp-connection-manager.ts',
 	},
 	// Сборка покрытия кода
 	collectCoverageFrom: [
@@ -51,7 +54,6 @@ const config: JestConfigWithTsJest = {
 		'!src/**/__tests__/**/*.ts',
 		'!src/**/*.spec.ts',
 		'!src/**/*.d.ts',
-		'!src/index.ts',
 		'!src/types/**/*.ts',
 	],
 	// Высокие пороги покрытия для критичного пакета

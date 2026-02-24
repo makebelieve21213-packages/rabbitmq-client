@@ -5,6 +5,16 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и этот проект придерживается [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.0.3] - 2026-02-24
+
+### Добавлено
+- Класс `CustomServerRMQ`, расширяющий `ServerRMQ` из `@nestjs/microservices`
+- Использование: `app.connectMicroservice({ strategy: new CustomServerRMQ(options) })`
+- Улучшенное логирование ошибок в `registerDisconnectListener` — корректная обработка разных типов `err` (Error, string, object)
+- Поддержка `options.pattern` в `setupChannel` для явного указания routing keys (comma-separated строка)
+- Упрощённая логика `assertQueue` — везде используется `this.queue` напрямую
+- Экспорт `CustomServerRMQ` из пакета
+
 ## [1.0.2] - 2026-01-11
 
 ### Изменено

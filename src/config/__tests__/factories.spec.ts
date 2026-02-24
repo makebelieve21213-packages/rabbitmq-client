@@ -170,6 +170,7 @@ describe("RabbitMQ Config Factories", () => {
 			expect(config.options.queue).toBe(`${baseReceiverOptions.queue}.retry`);
 			expect(config.options.exchange).toBe(`${baseReceiverOptions.exchange}.retry`);
 			expect(config.options.exchangeType).toBe(baseReceiverOptions.exchangeType);
+			expect(config.options.pattern).toBe(baseReceiverOptions.pattern);
 		});
 
 		it("должен использовать дефолтный TTL если не указан", () => {

@@ -17,6 +17,9 @@ src/
 │   ├── rabbitmq.service.ts               # RabbitMQService - основной сервис отправки
 │   └── rabbitmq.interceptor.ts           # RabbitMQIdempotencyInterceptor - интерцептор идемпотентности
 │
+├── server/                               # CustomServerRMQ (расширение ServerRMQ)
+│   └── custom-server-rmq.ts             # CustomServerRMQ - стратегия для connectMicroservice
+│
 ├── config/                               # Фабрики конфигураций
 │   └── factories.ts                      # createSenderConfig, createReceiverConfig, createRetryConfig, createDLXConfig
 │
@@ -54,10 +57,18 @@ NestJS глобальный модуль для регистрации RabbitMQS
 
 Сервис для отправки сообщений через RabbitMQ:
 - Конструктор принимает `ClientProxy` через DI по ключу `RABBITMQ_SENDER_SERVICE`
-- `fireAndForget<I>(key: ROUTING_KEYS, data: I)` - отправка без ожидания ответа (emit), не добавляет correlationId
-- `publish<I, O>(key: ROUTING_KEYS, data: I): Promise<O>` - отправка с ожиданием ответа (send, RPC pattern), автоматически добавляет correlationId и correlationTimestamp для идемпотентности
+- `fireAndForget<I>(key: string, data: I)` - отправка без ожидания ответа (emit), не добавляет correlationId. Ключ - строка из объекта `routingKeys` конфигурации
+- `publish<I, O>(key: string, data: I, options?: RmqRecordOptions): Promise<O>` - отправка с ожиданием ответа (send, RPC pattern), автоматически добавляет correlationId и correlationTimestamp. Опциональный параметр `options` для заголовков, приоритета и других метаданных
 - Реализует `OnModuleInit` и `OnModuleDestroy` для управления подключением
 - Получает `routingKeys` из конфигурации sender динамически через `createSenderConfig()` из `ConfigService.get("rabbitmqSender")`
+
+### CustomServerRMQ
+
+Расширение `ServerRMQ` из `@nestjs/microservices` для использования с `app.connectMicroservice()`:
+- Улучшенное логирование ошибок при отключении (корректная обработка Error, string, object)
+- Поддержка `options.pattern` - comma-separated строка routing keys для явного bind очереди к exchange
+- Если `pattern` не указан, используются routing keys из зарегистрированных `@MessagePattern` обработчиков
+- Использование: `app.connectMicroservice({ strategy: new CustomServerRMQ(options) })`
 
 ### connectRabbitMQReceiver
 
@@ -102,7 +113,7 @@ NestJS глобальный модуль для регистрации RabbitMQS
 
 Конфигурация для настройки модуля отправки сообщений:
 - `RabbitMQSenderOptions` - опции для sender конфигурации
-  - Обязательные: `url`, `exchange`, `exchangeType`
+  - Обязательные: `url`, `exchange`, `exchangeType`, `routingKeys` (Record<string, string> - определяются в проекте)
   - Опциональные: `replyQueueOptions` с параметрами `durable` (default: false) и `autoDelete` (default: true)
 
 ### RabbitMQReceiverOptions
@@ -168,6 +179,11 @@ const rabbitmqConfig = registerAs<RabbitMQConfiguration>(
         url: process.env[EnvVariable.RABBITMQ_URL]!,
         exchange: process.env[EnvVariable.RABBITMQ_EXCHANGE] || "events_exchange",
         exchangeType: process.env[EnvVariable.RABBITMQ_EXCHANGE_TYPE] || "topic",
+        routingKeys: {
+          "tokens.fetch.all": "tokens.fetch.all",
+          "analytics.global": "analytics.global",
+          "analytics.update.global": "analytics.update.global",
+        },
       },
       receiver: {
         url: process.env[EnvVariable.RABBITMQ_URL]!,
@@ -248,21 +264,50 @@ async function bootstrap() {
 bootstrap();
 ```
 
+### Альтернатива: CustomServerRMQ через connectMicroservice
+
+Вместо `connectRabbitMQReceiver` можно использовать `CustomServerRMQ` напрямую:
+
+```typescript
+// main.ts
+import { NestFactory } from "@nestjs/core";
+import { CustomServerRMQ } from "@makebelieve21213-packages/rabbitmq-client";
+import { AppModule } from "./app.module";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice({
+    strategy: new CustomServerRMQ({
+      urls: [process.env.RABBITMQ_URL!],
+      queue: process.env.RABBITMQ_QUEUE!,
+      queueOptions: { durable: true },
+      exchange: process.env.RABBITMQ_EXCHANGE || "events_exchange",
+      exchangeType: "topic",
+      wildcards: true,
+      pattern: "tokens.fetch.all,analytics.global,analytics.update.global",
+    }),
+  });
+
+  await app.startAllMicroservices();
+  await app.listen(3000);
+}
+```
+
 ### Использование сервиса
 
 ```typescript
 // your.service.ts
 import { Injectable } from '@nestjs/common';
 import { RabbitMQService } from '@makebelieve21213-packages/rabbitmq-client';
-import { ROUTING_KEYS } from '@makebelieve21213-packages/rabbitmq-client';
 
 @Injectable()
 export class YourService {
   constructor(private readonly rabbitMQ: RabbitMQService) {}
 
   async sendFireAndForget() {
-    // Fire and forget - не добавляет correlationId
-    await this.rabbitMQ.fireAndForget(ROUTING_KEYS.ANALYTICS_UPDATE_GLOBAL, {
+    // Fire and forget - не добавляет correlationId. Ключ из routingKeys конфигурации
+    await this.rabbitMQ.fireAndForget("analytics.update.global", {
       data: "example"
     });
   }
@@ -270,7 +315,7 @@ export class YourService {
   async sendRequestResponse() {
     // Request-Response - автоматически добавляет correlationId и correlationTimestamp
     const result = await this.rabbitMQ.publish<RequestData, ResponseData>(
-      ROUTING_KEYS.ANALYTICS_GLOBAL,
+      "analytics.global",
       { query: "analytics" }
     );
     return result;
@@ -296,6 +341,9 @@ export class YourService {
 Сервисы:
 - `RabbitMQService` (default export)
 
+Server:
+- `CustomServerRMQ` (default export) - расширение ServerRMQ для connectMicroservice
+
 Функции:
 - `connectRabbitMQReceiver` (default export)
 - `connectRabbitMQReceivers` (default export)
@@ -307,6 +355,8 @@ export class YourService {
 - `RabbitMQSenderOptions`, `RabbitMQReceiverOptions`
 - `RabbitMQReceiverSubscription`, `RabbitMQReceiversConfig`
 - `IdempotentMessage`
+- `RmqRecordOptions` (из @nestjs/microservices)
+- `RoutingKey`, `RoutingKeys`
 
 Фабрики:
 - `createReceiverConfig`, `createRetryConfig`, `createDLXConfig`

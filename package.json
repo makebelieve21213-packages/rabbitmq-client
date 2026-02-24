@@ -1,6 +1,6 @@
 {
 	"name": "@makebelieve21213-packages/rabbitmq-client",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "RabbitMQ client module for NestJS microservices communication using message queues",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -48,12 +48,13 @@
 		"prepare": "husky"
 	},
 	"dependencies": {
-		"@nestjs/common": "^11.1.6",
-		"@nestjs/config": "^4.0.2",
-		"@nestjs/microservices": "^11.1.6",
 		"@makebelieve21213-packages/logger": "^1.0.7",
 		"@makebelieve21213-packages/nest-common": "^1.1.3",
 		"@makebelieve21213-packages/redis-client": "^1.0.1",
+		"@nestjs/common": "^11.1.6",
+		"@nestjs/config": "^4.0.2",
+		"@nestjs/microservices": "^11.1.6",
+		"amqp-connection-manager": "^5.0.0",
 		"rxjs": "^7.8.2",
 		"uuid": "^11.1.0"
 	},

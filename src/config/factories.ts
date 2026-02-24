@@ -91,6 +91,7 @@ export function createRetryConfig(options: RabbitMQReceiverOptions): RabbitMQCon
 			exchange: retryExchange,
 			exchangeType: retryExchangeType,
 			wildcards: true,
+			pattern: options.pattern,
 		},
 	};
 }
