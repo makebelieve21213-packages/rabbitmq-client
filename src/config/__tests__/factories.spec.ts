@@ -129,15 +129,13 @@ describe("RabbitMQ Config Factories", () => {
 			expect(config.options.noAck).toBe(true);
 		});
 
-		it("должен создать DLX настройки для retry очереди", () => {
+		it("должен создать DLX настройки для retry очереди (без x-dead-letter-routing-key)", () => {
 			const config = createReceiverConfig(baseReceiverOptions);
 
 			expect(config.options.queueOptions.arguments["x-dead-letter-exchange"]).toBe(
 				`${baseReceiverOptions.exchange}.retry`
 			);
-			expect(config.options.queueOptions.arguments["x-dead-letter-routing-key"]).toBe(
-				baseReceiverOptions.pattern
-			);
+			expect(config.options.queueOptions.arguments).not.toHaveProperty("x-dead-letter-routing-key");
 		});
 
 		it("должен использовать кастомный retryExchange если указан", () => {
@@ -157,7 +155,7 @@ describe("RabbitMQ Config Factories", () => {
 			const config = createReceiverConfig(baseReceiverOptions, customPattern);
 
 			expect(config.options.pattern).toBe(customPattern);
-			expect(config.options.queueOptions.arguments["x-dead-letter-routing-key"]).toBe(customPattern);
+			expect(config.options.queueOptions.arguments).not.toHaveProperty("x-dead-letter-routing-key");
 		});
 	});
 
@@ -189,15 +187,13 @@ describe("RabbitMQ Config Factories", () => {
 			expect(config.options.queueOptions.arguments["x-message-ttl"]).toBe(10000);
 		});
 
-		it("должен создать DLX настройки для возврата в основную очередь", () => {
+		it("должен создать DLX настройки для возврата в основную очередь (без x-dead-letter-routing-key)", () => {
 			const config = createRetryConfig(baseReceiverOptions);
 
 			expect(config.options.queueOptions.arguments["x-dead-letter-exchange"]).toBe(
 				baseReceiverOptions.exchange
 			);
-			expect(config.options.queueOptions.arguments["x-dead-letter-routing-key"]).toBe(
-				baseReceiverOptions.pattern
-			);
+			expect(config.options.queueOptions.arguments).not.toHaveProperty("x-dead-letter-routing-key");
 		});
 
 		it("должен использовать кастомные параметры retry если указаны", () => {
@@ -225,6 +221,8 @@ describe("RabbitMQ Config Factories", () => {
 			expect(config.options.exchange).toBe("events_exchange.dlx");
 			expect(config.options.exchangeType).toBe(baseReceiverOptions.exchangeType);
 			expect(config.options.wildcards).toBe(true);
+			expect(config.options.pattern).toBe("#");
+			expect(config.options.noAck).toBe(true);
 		});
 
 		it("должен использовать кастомные параметры DLX если указаны", () => {
@@ -239,6 +237,8 @@ describe("RabbitMQ Config Factories", () => {
 			expect(config.options.queue).toBe("custom.dlx.queue");
 			expect(config.options.exchange).toBe("custom.dlx.exchange");
 			expect(config.options.exchangeType).toBe("fanout");
+			expect(config.options.pattern).toBe("#");
+			expect(config.options.noAck).toBe(true);
 		});
 	});
 });

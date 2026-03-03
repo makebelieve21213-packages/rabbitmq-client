@@ -1,4 +1,9 @@
 import type RabbitMQConfigBase from "src/types/base.config";
 
 // Тип конфигурации для DLX RabbitMQ
-export default interface RabbitMQConfigDLX extends RabbitMQConfigBase {}
+export default interface RabbitMQConfigDLX extends RabbitMQConfigBase {
+	options: RabbitMQConfigBase["options"] & {
+		pattern: string;
+		noAck: boolean;
+	};
+}

@@ -36,7 +36,6 @@ describe("connectRabbitMQReceiver", () => {
 				durable: true,
 				arguments: {
 					"x-dead-letter-exchange": "test_exchange.retry",
-					"x-dead-letter-routing-key": "test.*",
 				},
 			},
 			exchange: "test_exchange",
@@ -57,7 +56,6 @@ describe("connectRabbitMQReceiver", () => {
 				durable: true,
 				arguments: {
 					"x-dead-letter-exchange": "test_exchange",
-					"x-dead-letter-routing-key": "test.*",
 					"x-message-ttl": 5000,
 				},
 			},
@@ -72,12 +70,12 @@ describe("connectRabbitMQReceiver", () => {
 		options: {
 			urls: ["amqp://localhost:5672"],
 			queue: "global.dlx",
-			queueOptions: {
-				durable: true,
-			},
+			queueOptions: { durable: true },
 			exchange: "events_exchange.dlx",
 			exchangeType: "topic",
 			wildcards: true,
+			pattern: "#",
+			noAck: true,
 		},
 	};
 

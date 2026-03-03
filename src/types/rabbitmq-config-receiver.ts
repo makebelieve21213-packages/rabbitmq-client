@@ -6,7 +6,6 @@ export default interface RabbitMQConfigReciever extends RabbitMQConfigBase {
 		queueOptions: {
 			arguments: {
 				"x-dead-letter-exchange": string;
-				"x-dead-letter-routing-key": string;
 			};
 		} & RabbitMQConfigBase["options"]["queueOptions"];
 		pattern: string;

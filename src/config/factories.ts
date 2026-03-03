@@ -51,8 +51,6 @@ export function createReceiverConfig(
 				durable: true,
 				arguments: {
 					"x-dead-letter-exchange": retryExchange,
-					// Используем паттерн для DLX routing key
-					"x-dead-letter-routing-key": receiverPattern,
 				},
 			},
 			exchange: options.exchange,
@@ -84,7 +82,6 @@ export function createRetryConfig(options: RabbitMQReceiverOptions): RabbitMQCon
 				durable: true,
 				arguments: {
 					"x-dead-letter-exchange": options.exchange,
-					"x-dead-letter-routing-key": options.pattern,
 					"x-message-ttl": retryTtl,
 				},
 			},
@@ -111,12 +108,12 @@ export function createDLXConfig(options: RabbitMQReceiverOptions): RabbitMQConfi
 		options: {
 			urls: [options.url],
 			queue: dlxQueue,
-			queueOptions: {
-				durable: true,
-			},
+			queueOptions: { durable: true },
 			exchange: dlxExchange,
 			exchangeType: dlxExchangeType,
 			wildcards: true,
+			pattern: "#",
+			noAck: true,
 		},
 	};
 }

@@ -5,6 +5,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и этот проект придерживается [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.0.4] - 2026-03-03
+
+### Исправлено
+- Удалено свойство `x-dead-letter-routing-key` из `createReceiverConfig` и `createRetryConfig` — при нескольких паттернах (comma-separated) это ломало retry: AMQP трактовал строку как единый routing key, сообщения из retry-очереди не возвращались в основную. Без свойства RabbitMQ сохраняет оригинальный routing key при dead-letter
+- Добавлены `pattern: '#'` и `noAck: true` в `createDLXConfig` — очередь `global.dlx` не была привязана к exchange (при `wildcards: true` без pattern берутся routing keys из хендлеров, у DLX их нет), сообщения терялись
+
 ## [1.0.3] - 2026-02-24
 
 ### Добавлено

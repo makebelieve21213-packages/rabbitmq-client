@@ -7,7 +7,6 @@ export default interface RabbitMQConfigRetry extends RabbitMQConfigBase {
 		queueOptions: {
 			arguments: {
 				"x-dead-letter-exchange": string;
-				"x-dead-letter-routing-key": string;
 				"x-message-ttl": number;
 			};
 		} & RabbitMQConfigBase["options"]["queueOptions"];
