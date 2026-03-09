@@ -87,10 +87,7 @@ export default [
 	// Основные файлы пакета (исключая тесты)
 	{
 		files: ["src/**/*.ts"],
-		ignores: [
-			"src/**/*.spec.ts",
-			"src/**/__tests__/**/*.ts",
-		],
+		ignores: ["src/**/*.spec.ts", "src/**/__tests__/**/*.ts"],
 		languageOptions: {
 			parser: parser,
 			parserOptions: {
@@ -115,10 +112,7 @@ export default [
 	},
 	// Тестовые файлы
 	{
-		files: [
-			"src/**/*.spec.ts",
-			"src/**/__tests__/**/*.ts",
-		],
+		files: ["src/**/*.spec.ts", "src/**/__tests__/**/*.ts"],
 		languageOptions: {
 			parser: parser,
 			parserOptions: {

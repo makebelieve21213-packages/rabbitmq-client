@@ -25,8 +25,10 @@ export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 	) {
 		this.logger.setContext(RabbitMQService.name);
 
-		// Всегда вычисляем конфигурацию динамически из senderOptions
-		// Это гарантирует наличие routingKeys без необходимости регистрации в ConfigService
+		/**
+		 * Всегда вычисляем конфигурацию динамически из senderOptions
+		 * Это гарантирует наличие routingKeys без необходимости регистрации в ConfigService
+		 */
 		const senderOptions = this.configService.get<RabbitMQSenderOptions>("rabbitmqSender");
 		if (!senderOptions) {
 			throw new Error("RabbitMQ sender options not found in configuration");
@@ -94,7 +96,6 @@ export default class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 	 * Отправляем сообщение по указанному routingKey и ждем ответ от получателя (request-response паттерн)
 	 * Добавляем correlationId и correlationTimestamp для идемпотентности
 	 * Поддерживает передачу заголовков и других опций через параметр options
-	 * @param key - ключ маршрутизации из объекта routingKeys конфигурации
 	 */
 	async publish<I, O>(key: string, data: I, options?: RmqRecordOptions): Promise<O> {
 		const routingKey = this.rk[key];

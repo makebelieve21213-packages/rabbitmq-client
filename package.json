@@ -43,8 +43,8 @@
 		"test:coverage": "jest --coverage",
 		"lint": "tsc --noEmit && eslint \"src/**/*.ts\"",
 		"lint:fix": "tsc --noEmit && eslint \"src/**/*.ts\" --fix",
-		"format": "prettier --check \"src/**/*.ts\"",
-		"format:fix": "prettier --write \"src/**/*.ts\"",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
 		"prepare": "husky"
 	},
 	"dependencies": {
